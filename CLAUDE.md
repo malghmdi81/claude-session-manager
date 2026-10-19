@@ -5,10 +5,12 @@
 
 ## هيكل المشروع
 
-- `main.py` — كل منطق التطبيق: FileManager، Session، CommandManager، SessionManager.
+- `main.py` — كل منطق التطبيق: FileManager، Session، CommandManager، SessionManager،
+  و`TimerNotifier` (سطر العدّاد). الأوامر تتحكم بالمؤقت عبر `self.notifier` فقط.
 - `commands.json` — تعريف الأوامر التسعة (الاسم العربي ← action). لا تضف أمراً
   في الكود دون إضافته هنا.
-- `config.json` — الإعدادات. مدة المؤقت في `timer.default_interval` بالدقائق.
+- `config.json` — الإعدادات. مدة المؤقت في `timer.default_interval` بالدقائق،
+  وفترة تحديث السطر في `timer.notification_interval_seconds` (20).
 - `test_*.py` — الاختبارات (unittest فقط، بلا مكتبات خارجية).
 - `.claude/hooks/protect_data.py` — Hook يمنع تعديل ملفات البيانات (انظر أدناه).
 
@@ -69,3 +71,7 @@ python -m unittest test_commands -v   # اختبار ملف واحد
 ## حدود معروفة
 
 - إدخال رقم الأمر (مثل `1`) لا يعمل بعد؛ الأوامر تُقبل بالاسم العربي فقط.
+- سطر العدّاد يُعاد رسمه بـ `\r` مع سطر الإدخال، فإن كان المستخدم يكتب لحظة التحديث
+  يختفي ما كتبه من الشاشة (لكنه يبقى في الإدخال). هذا قيد الطرفية وليس خطأ.
+- لتجربة المؤقت يدوياً بسرعة: ضع `default_interval` = 0.1 و`notification_interval_seconds`
+  = 2 في نسخة مؤقتة من `config.json`، ولا ترفع هذا التغيير.
