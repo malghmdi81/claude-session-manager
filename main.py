@@ -7,8 +7,11 @@
 """
 
 import json
+import math
 import os
 import sys
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -22,6 +25,103 @@ COMMANDS_FILE = "commands.json"
 SESSION_FILE = "current_session.json"
 ARCHIVE_DIR = "sessions_archive"
 HISTORY_FILE = ".history"
+PROMPT = "📌 اختر أمراً: "
+
+# ============================================================================
+# إشعار المؤقت على الشاشة
+# ============================================================================
+
+def format_mmss(seconds: float) -> str:
+    minutes, secs = divmod(int(math.ceil(seconds)), 60)
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def render_line(remaining: float, total: float, width: int = 30) -> str:
+    """سطر العدّاد. يبدأ بـ \\r ومسح السطر ليُرسم فوق السطر السابق."""
+    done = 0.0 if total <= 0 else min(1.0, max(0.0, (total - remaining) / total))
+    filled = int(done * width)
+    bar = "█" * filled + "░" * (width - filled)
+    return f"\r\033[K⏱️  المؤقت: [{bar}] {format_mmss(remaining)} متبقي"
+
+
+class TimerNotifier:
+    """يعيد رسم سطر العدّاد كل `interval` ثانية ما دام المؤقت نشطاً فقط."""
+
+    def __init__(self, interval: float = 20, out=None, clock=time.monotonic):
+        self.interval = interval
+        self.out = out
+        self.clock = clock
+        self.total = 0.0
+        self.remaining = 0.0
+        self.running = False
+        self._started_at = 0.0
+        self._stop_event = threading.Event()
+        self._thread = None
+        self._lock = threading.Lock()
+
+    def start(self, total_seconds: float):
+        self.stop()
+        self.total = self.remaining = float(total_seconds)
+        self._run()
+
+    def pause(self):
+        """يوقف العدّ ويحتفظ بالوقت المتبقي ليُستكمل منه."""
+        with self._lock:
+            if self.running:
+                self.remaining = self.remaining_seconds()
+                self.running = False
+        self._halt_thread()
+
+    def resume(self):
+        if not self.running and self.remaining > 0:
+            self._run()
+
+    def stop(self):
+        self.pause()
+        self.remaining = 0.0
+
+    def remaining_seconds(self) -> float:
+        if not self.running:
+            return self.remaining
+        return max(0.0, self.remaining - (self.clock() - self._started_at))
+
+    def tick(self, first: bool = False):
+        """يرسم السطر مرة واحدة، ويطلق المنبه عند انتهاء الوقت."""
+        out = self.out or sys.stdout
+        with self._lock:
+            if not self.running:
+                return
+            left = self.remaining_seconds()
+            if left <= 0:
+                self.running = False
+                self.remaining = 0.0
+                self._stop_event.set()
+                out.write("\r\033[K\a⏰ انتهى وقت المؤقت! خذ بريك أو اكتب: ابدأ\n" + PROMPT)
+            else:
+                out.write(render_line(left, self.total) + ("\n" if first else "  " + PROMPT))
+            out.flush()
+
+    def _run(self):
+        self._started_at = self.clock()
+        self.running = True
+        self._stop_event = threading.Event()
+        self.tick(first=True)
+        self._thread = threading.Thread(target=self._loop, args=(self._stop_event,), daemon=True)
+        self._thread.start()
+
+    def _loop(self, stop_event: threading.Event):
+        # ننتظر الأقل من الفترة والوقت المتبقي حتى يرن المنبه في وقته
+        while not stop_event.wait(min(self.interval, max(self.remaining_seconds(), 0.05))):
+            self.tick()
+            if not self.running:
+                break
+
+    def _halt_thread(self):
+        self._stop_event.set()
+        thread = self._thread
+        if thread and thread is not threading.current_thread():
+            thread.join(timeout=1)
+        self._thread = None
 
 # ============================================================================
 # فئة إدارة الملفات
@@ -118,10 +218,13 @@ class Session:
 class CommandManager:
     """تنفيذ وإدارة الأوامر التسعة"""
 
-    def __init__(self, session: Session, config: Dict, commands: Dict):
+    def __init__(self, session: Session, config: Dict, commands: Dict, notifier=None):
         self.session = session
         self.config = config
         self.commands = commands
+        timer_config = config.get('timer', {})
+        self.notifier = notifier or TimerNotifier(
+            interval=timer_config.get('notification_interval_seconds', 20))
 
     def execute(self, command_name: str) -> Dict:
         """تنفيذ أمر محدد"""
@@ -163,6 +266,9 @@ class CommandManager:
         """1. ابدأ - تجهيز + بدء المؤقت"""
         self.session.data['status'] = 'active'
         self.session.data['start_time'] = datetime.now().isoformat()
+        minutes = self.config.get('timer', {}).get('default_interval', 25)
+        self.session.data['timer_minutes'] = minutes
+        self.notifier.start(minutes * 60)
         self.session.add_to_history("START_SESSION")
         self.session.save()
         return {
@@ -176,6 +282,7 @@ class CommandManager:
         """2. توقف - إيقاف + عرض الاقتراحات"""
         self.session.data['status'] = 'paused'
         self.session.data['end_time'] = datetime.now().isoformat()
+        self.notifier.stop()
         self.session.add_to_history("STOP_SESSION")
         self.session.save()
 
@@ -211,6 +318,7 @@ class CommandManager:
     def cmd_pause(self) -> Dict:
         """4. بريك - توقف مؤقت للمؤقت"""
         self.session.data['status'] = 'paused'
+        self.notifier.pause()
         self.session.add_to_history("PAUSE_TIMER")
         self.session.save()
 
@@ -221,12 +329,13 @@ class CommandManager:
 
         return {
             "success": True,
-            "message": "✅ تم إيقاف المؤقت مؤقتاً"
+            "message": f"✅ تم إيقاف المؤقت مؤقتاً — المتبقي {format_mmss(self.notifier.remaining)}"
         }
 
     def cmd_resume(self) -> Dict:
         """5. اكمل - استئناف المؤقت"""
         self.session.data['status'] = 'active'
+        self.notifier.resume()
         self.session.add_to_history("RESUME_TIMER")
         self.session.save()
         return {
@@ -238,6 +347,7 @@ class CommandManager:
         """6. خروج - مغادرة مع حفظ"""
         self.session.data['status'] = 'closed'
         self.session.data['end_time'] = datetime.now().isoformat()
+        self.notifier.stop()
         self.session.add_to_history("EXIT_SESSION")
 
         # أرشفة الجلسة
@@ -257,6 +367,7 @@ class CommandManager:
     def cmd_suspend(self) -> Dict:
         """7. نوم - تعليق مع ملخص"""
         self.session.data['status'] = 'suspended'
+        self.notifier.stop()
         self.session.add_to_history("SUSPEND_SESSION")
 
         summary = {
@@ -277,6 +388,7 @@ class CommandManager:
         """8. اقفال - إغلاق + نقل للأرشيف"""
         self.session.data['status'] = 'locked'
         self.session.data['end_time'] = datetime.now().isoformat()
+        self.notifier.stop()
         self.session.add_to_history("LOCK_SESSION")
 
         archive_file = os.path.join(
@@ -322,6 +434,8 @@ class SessionManager:
 
     def __init__(self):
         FileManager.ensure_directories()
+        if os.name == "nt":
+            os.system("")  # تفعيل رموز ANSI (مسح السطر) في طرفية ويندوز
 
         self.config = FileManager.load_json(CONFIG_FILE)
         self.commands = FileManager.load_json(COMMANDS_FILE)
@@ -368,6 +482,7 @@ class SessionManager:
                     print(f"\n{result['message']}")
 
             except KeyboardInterrupt:
+                self.cmd_manager.notifier.stop()
                 print("\n\n⚠️  تم الإيقاف من قبل المستخدم")
                 break
             except Exception as e:
