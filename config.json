@@ -1,0 +1,41 @@
+{
+  "application": {
+    "name": "مدير جلسة كلود",
+    "version": "1.0.0",
+    "language": "ar"
+  },
+  "timer": {
+    "default_interval": 25,
+    "unit": "minutes",
+    "health_reminder_interval": 5,
+    "health_reminder_enabled": true
+  },
+  "model_switching": {
+    "baseline": "claude-haiku-4.5",
+    "complex_task": "claude-sonnet-5.5",
+    "very_complex": "claude-opus-5.5",
+    "auto_switch": true
+  },
+  "history": {
+    "max_undo_steps": 20,
+    "auto_save": true,
+    "save_interval": 1
+  },
+  "session": {
+    "auto_archive": true,
+    "archive_path": "sessions_archive",
+    "create_summary": true
+  },
+  "user_preferences": {
+    "notifications": true,
+    "verbose_output": false,
+    "token_optimization": true
+  },
+  "paths": {
+    "current_session": "current_session.json",
+    "command_definitions": "commands.json",
+    "config_file": "config.json",
+    "notes": "notes.md",
+    "archive_dir": "sessions_archive"
+  }
+}

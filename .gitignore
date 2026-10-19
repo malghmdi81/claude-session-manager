@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# بيانات الجلسات تُنشأ أثناء التشغيل ولا تُرفع
+current_session.json
+.history
+sessions_archive/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# إعدادات Claude Code الشخصية (المشتركة تبقى في settings.json)
+.claude/settings.local.json

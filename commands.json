@@ -1,0 +1,98 @@
+{
+  "commands": [
+    {
+      "number": 1,
+      "name": "ابدأ",
+      "action": "start_session",
+      "description": "تجهيز الجلسة + بدء المؤقت",
+      "parameters": {
+        "timer_start": true,
+        "model": "haiku-4.5"
+      }
+    },
+    {
+      "number": 2,
+      "name": "توقف",
+      "action": "stop_session",
+      "description": "إيقاف الجلسة + عرض الاقتراحات",
+      "parameters": {
+        "show_suggestions": true,
+        "save_log": true
+      }
+    },
+    {
+      "number": 3,
+      "name": "تراجع",
+      "action": "undo",
+      "description": "الرجوع خطوة واحدة من التاريخ (20 خطوة قصوى)",
+      "parameters": {
+        "max_steps": 20,
+        "show_menu": true
+      }
+    },
+    {
+      "number": 4,
+      "name": "بريك",
+      "action": "pause_timer",
+      "description": "توقف مؤقت للمؤقت",
+      "parameters": {
+        "timer_pause": true,
+        "health_reminder": true
+      }
+    },
+    {
+      "number": 5,
+      "name": "اكمل",
+      "action": "resume_timer",
+      "description": "استئناف المؤقت والعمل",
+      "parameters": {
+        "timer_resume": true
+      }
+    },
+    {
+      "number": 6,
+      "name": "خروج",
+      "action": "exit_session",
+      "description": "مغادرة النظام مع حفظ البيانات",
+      "parameters": {
+        "save_state": true,
+        "archive": true
+      }
+    },
+    {
+      "number": 7,
+      "name": "نوم",
+      "action": "suspend_session",
+      "description": "تعليق الجلسة مع ملخص عند العودة",
+      "parameters": {
+        "create_summary": true,
+        "notify_on_resume": true
+      }
+    },
+    {
+      "number": 8,
+      "name": "اقفال",
+      "action": "lock_session",
+      "description": "إغلاق + نقل الملفات للأرشيف",
+      "parameters": {
+        "archive_files": true,
+        "lock_state": true
+      }
+    },
+    {
+      "number": 9,
+      "name": "عودة",
+      "action": "restore_session",
+      "description": "استعادة جلسة سابقة من الأرشيف",
+      "parameters": {
+        "show_history": true,
+        "restore_context": true
+      }
+    }
+  ],
+  "metadata": {
+    "version": "1.0",
+    "language": "arabic",
+    "created": "2026-10-18"
+  }
+}
