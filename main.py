@@ -466,6 +466,8 @@ class SessionManager:
                 user_input = input("📌 اختر أمراً: ").strip()
 
                 if user_input.lower() in ['خروج', 'exit', 'quit']:
+                    # ننفّذ أمر الخروج فعلاً: يوقف المؤقت ويؤرشف الجلسة
+                    print(f"\n{self.cmd_manager.execute('خروج')['message']}")
                     print("\n👋 وداعاً!")
                     break
 
