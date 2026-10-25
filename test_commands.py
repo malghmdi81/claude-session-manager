@@ -24,9 +24,11 @@ class CommandTestCase(unittest.TestCase):
         with open(os.path.join(REPO_DIR, "commands.json"), encoding="utf-8") as f:
             commands = json.load(f)
         self.session = main.Session()
-        self.cm = main.CommandManager(self.session, {}, commands)
+        quiet = main.TimerNotifier(interval=3600, out=io.StringIO())
+        self.cm = main.CommandManager(self.session, {}, commands, notifier=quiet)
 
     def tearDown(self):
+        self.cm.notifier.stop()
         os.chdir(self._old_cwd)
         shutil.rmtree(self._tmp, ignore_errors=True)
 
